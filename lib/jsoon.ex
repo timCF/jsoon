@@ -1,6 +1,17 @@
 defmodule Jsoon do
   use Application
 
+ defp reload_protocols do
+    :code.delete(Access)
+    :code.delete(Collectable)
+    :code.delete(Enumerable)
+    :code.delete(Inspect)
+    :code.delete(List.Chars)
+    :code.delete(Range.Iterator)
+    :code.delete(String.Chars)
+    :code.delete(HashUtils)
+  end
+
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
   # for more information on OTP Applications
   def start(_type, _args) do
@@ -14,7 +25,9 @@ defmodule Jsoon do
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Jsoon.Supervisor]
-    Supervisor.start_link(children, opts)
+    res = Supervisor.start_link(children, opts)
+    reload_protocols
+    res
   end
 
   #
@@ -37,17 +50,32 @@ defmodule Jsoon do
   # decoding
   #
 
-  def decode(bin) when is_binary(bin) do
+  def decode(bin, opts \\ []) when is_binary(bin) do
     case :jsonx.decode(bin, [format: :proplist]) do
       tuple when is_tuple(tuple) -> raise "#{__MODULE__} : error #{inspect tuple} while decoding term #{bin}"
-      res -> parse_decoded(res)
+      res -> parse_decoded(res, opts)
     end
   end
-  defp parse_decoded(term) do
-    term
-    #
-    # TODO
-    #
+  defp parse_decoded(klst = [{_k,_v}|_], opts) do
+    Enum.reduce(klst, %{}, fn({k,v}, resmap) -> Map.put(resmap, make_key(k, opts), parse_decoded(v, opts)) end)
+  end
+  defp parse_decoded(lst, opts) when is_list(lst), do: Enum.map(lst, &(parse_decoded(&1, opts)) )
+  defp parse_decoded(:null, _), do: nil
+  defp parse_decoded(term, _), do: term
+
+  defp make_key(k, opts) do
+    case {opts[:keys_numbers], opts[:keys_atoms]} do
+      {nil, nil} -> k
+      {false, false} -> k
+      {nil, true} -> Maybe.to_atom(k)
+      {false, true} -> Maybe.to_atom(k)
+      {true, true} -> case Maybe.to_number(k) do
+                        num when is_number(num) -> num
+                        _ -> Maybe.to_atom(k)
+                      end
+      {true, nil} -> Maybe.to_number(k)
+      {true, false} -> Maybe.to_number(k)
+    end
   end
 
 end

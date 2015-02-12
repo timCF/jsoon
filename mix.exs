@@ -14,7 +14,8 @@ defmodule Jsoon.Mixfile do
   def application do
     [applications:  [
                       :logger,
-                      :jsonx
+                      :jsonx,
+                      :maybe
                     ],
      mod: {Jsoon, []}]
   end
@@ -29,6 +30,9 @@ defmodule Jsoon.Mixfile do
   #
   # Type `mix help deps` for more examples and options
   defp deps do
-    [{:jsonx, github: "iskra/jsonx"}]
+    [
+      {:jsonx, github: "iskra/jsonx"},
+      {:maybe, github: "timCF/maybe"}
+    ]
   end
 end
